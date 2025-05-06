@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 
 export enum OIDCError {
   invalid_state = "invalid_state",
+  code_verifier_not_found = "code_verifier_not_found",
+  token_fetch_failed = "token_fetch_failed",
 }
 
 // OIDCのコールバックURL
@@ -26,6 +28,16 @@ export async function GET(request: Request) {
   }
   console.log("stateの確認完了！！");
 
+  // PKCEの存在チェック
+  const codeVerifier = session.auth?.code_verifier;
+  if (!codeVerifier) {
+    // code_verifierがsessionに存在しない場合はCSRF攻撃の可能性がある
+    console.error("PKCE verification failed: code_verifier not found");
+    session.auth = undefined;
+    await session.save();
+    return NextResponse.redirect(new URL(`/?error=${OIDCError.code_verifier_not_found}`, request.url));
+  }
+
   // 認可コードを取得
   const code = searchParams.get("code");
 
@@ -36,6 +48,7 @@ export async function GET(request: Request) {
     redirect_uri: process.env.OIDC_CLIENT_REDIRECT_URI as string,
     code: code as string,
     grant_type: "authorization_code",
+    code_verifier: codeVerifier,
   });
   const baseURL = process.env.OIDC_ISSUER_TOKEN_ENDPOINT as string;
   const tokenResponse = await fetch(baseURL, {
@@ -45,6 +58,16 @@ export async function GET(request: Request) {
     },
     body: params,
   });
+
+  if (!tokenResponse.ok) {
+    // トークン取得に失敗した場合はPKCEの検証に失敗した可能性が高い
+    console.error("Failed to fetch token:", `${tokenResponse.status}: ${tokenResponse.statusText}`);
+    console.error("Response body:", await tokenResponse.json());
+    session.auth = undefined;
+    await session.save();
+    return NextResponse.redirect(new URL(`/?error=${OIDCError.token_fetch_failed}`, request.url));
+  }
+
   const data = await tokenResponse.json();
   console.log(data);
 

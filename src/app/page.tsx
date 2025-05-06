@@ -18,6 +18,12 @@ export default async function Home({ searchParams }: { searchParams: Record<stri
     case OIDCError.invalid_state:
       errorMessage = "stateの検証に失敗しました。CSRF攻撃の可能性があります。";
       break;
+    case OIDCError.code_verifier_not_found:
+      errorMessage = "PKCE用のcode_verifierが設定されていません。CSRF攻撃の可能性があります。";
+      break;
+    case OIDCError.token_fetch_failed:
+      errorMessage = "トークンの取得に失敗しました。コードインジェクション攻撃の可能性があります。";
+      break;
     default:
       errorMessage = "不明なエラーが発生しました。";
       break;
