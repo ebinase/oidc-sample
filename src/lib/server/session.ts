@@ -8,6 +8,9 @@ export type SessionData = {
     name: string;
     picture: string;
   };
+  auth?: {
+    state: string; // CSRF対策のためのstate
+  };
 };
 
 export const sessionOptions: SessionOptions = {

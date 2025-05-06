@@ -4,11 +4,25 @@ import { NextResponse } from "next/server";
 // OIDCのコールバックURL
 // 認可コードの受取り、idトークンの取得・検証、ログイン処理を行う
 export async function GET(request: Request) {
-  // TODO: stateの検証
+  const { searchParams } = new URL(request.url);
+  console.log("searchParams", searchParams);
+  const session = await getSession();
+  console.log("session", session);
+
+  // stateの検証
+  const inputState = searchParams.get("state");
+  const sessionState = session.auth?.state;
+  
+  if (!inputState || !sessionState || inputState !== sessionState) {
+    // stateが一致しない場合はCSRF攻撃の可能性があるため、エラーを返す
+    console.error("CSRF attack detected: state mismatch");
+    session.auth = undefined;
+    await session.save();
+    return NextResponse.redirect(new URL("/?error=invalid_state", request.url));
+  }
+  console.log("stateの確認完了！！");
 
   // 認可コードを取得
-  const { searchParams } = new URL(request.url);
-  console.log(searchParams);
   const code = searchParams.get("code");
 
   // idトークンの取得
@@ -48,12 +62,12 @@ export async function GET(request: Request) {
   console.log(userInfo);
 
   // ログイン処理
-  const session = await getSession();
   session.user = {
     id: userInfo.sub,
     name: userInfo.name,
     picture: userInfo.picture,
   };
+  session.auth = undefined; // 認可情報は不要なので削除
   await session.save();
 
   // トップページにリダイレクト
