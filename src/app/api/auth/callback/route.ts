@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { getSession } from "@/lib/server/session";
+import { NextResponse } from "next/server";
 
 // OIDCのコールバックURL
 // 認可コードの受取り、idトークンの取得・検証、ログイン処理を行う
@@ -8,7 +9,7 @@ export async function GET(request: Request) {
   // 認可コードを取得
   const { searchParams } = new URL(request.url);
   console.log(searchParams);
-  const code = searchParams.get('code');
+  const code = searchParams.get("code");
 
   // idトークンの取得
   const params = new URLSearchParams({
@@ -16,27 +17,28 @@ export async function GET(request: Request) {
     client_secret: process.env.OIDC_CLIENT_SECRET as string,
     redirect_uri: process.env.OIDC_CLIENT_REDIRECT_URI as string,
     code: code as string,
-    grant_type: 'authorization_code',
+    grant_type: "authorization_code",
   });
   const baseURL = process.env.OIDC_ISSUER_TOKEN_ENDPOINT as string;
-  const response = await fetch(baseURL, {
-    method: 'POST',
+  const tokenResponse = await fetch(baseURL, {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      "Content-Type": "application/x-www-form-urlencoded",
     },
     body: params,
   });
-  const data = await response.json();
+  const data = await tokenResponse.json();
   console.log(data);
 
   // idトークンの検証
   // TODO: idトークンの署名検証、nonceの検証、audの検証
+  // TODO: DB上のユーザ情報と照合(登録済みならログイン、未登録なら登録処理を行う)
 
   // ユーザ情報の取得
   const userInfoResponse = await fetch(
     process.env.OIDC_ISSUER_USERINFO_ENDPOINT as string,
     {
-      method: 'GET',
+      method: "GET",
       headers: {
         Authorization: `Bearer ${data.access_token}`,
       },
@@ -45,20 +47,15 @@ export async function GET(request: Request) {
   const userInfo = await userInfoResponse.json();
   console.log(userInfo);
 
-  // TODO: DB上のユーザ情報と照合
-  // 登録済みならログイン、未登録なら登録処理を行う
-
   // ログイン処理
-  // FIXME: セッションなどの安全な方法で保存する
-  const username = userInfo.name;
-  const res = NextResponse.redirect(
-    new URL('/', request.url)
-  );
-  res.cookies.set('isLoggedIn', '1', {
-    httpOnly: true,
-  });
-  res.cookies.set('username', username, {
-    httpOnly: true,
-  });
-  return res;
+  const session = await getSession();
+  session.user = {
+    id: userInfo.sub,
+    name: userInfo.name,
+    picture: userInfo.picture,
+  };
+  await session.save();
+
+  // トップページにリダイレクト
+  return NextResponse.redirect(new URL("/", request.url));
 }
