@@ -1,11 +1,27 @@
 import { getSession } from "@/lib/server/session";
 import Image from "next/image";
+import { OIDCError } from "./api/auth/callback/route";
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Record<string, string> }) {
   // セッションからユーザ情報を取得
   const session = await getSession();
   const isLoggedIn = session.user !== undefined;
   const username = session.user?.name || "ゲスト";
+
+  // クエリパラメータによるエラーメッセージの表示
+  const { error } = await searchParams;
+  let errorMessage = "";
+  switch (error) { 
+    case undefined:
+      errorMessage = "";
+      break;
+    case OIDCError.invalid_state:
+      errorMessage = "stateの検証に失敗しました。CSRF攻撃の可能性があります。";
+      break;
+    default:
+      errorMessage = "不明なエラーが発生しました。";
+      break;
+  }
 
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
@@ -19,6 +35,9 @@ export default async function Home() {
           priority
         />
         <p className="text-xl font-bold">{`ようこそ、${username}さん！`}</p>
+        {errorMessage && (
+          <p className="text-red-500 text-sm">{errorMessage}</p>
+        )}
         <div className="flex gap-4 items-center flex-col sm:flex-row">
           {isLoggedIn ? (
             <a

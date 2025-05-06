@@ -1,6 +1,10 @@
 import { getSession } from "@/lib/server/session";
 import { NextResponse } from "next/server";
 
+export enum OIDCError {
+  invalid_state = "invalid_state",
+}
+
 // OIDCのコールバックURL
 // 認可コードの受取り、idトークンの取得・検証、ログイン処理を行う
 export async function GET(request: Request) {
@@ -18,7 +22,7 @@ export async function GET(request: Request) {
     console.error("CSRF attack detected: state mismatch");
     session.auth = undefined;
     await session.save();
-    return NextResponse.redirect(new URL("/?error=invalid_state", request.url));
+    return NextResponse.redirect(new URL(`/?error=${OIDCError.invalid_state}`, request.url));
   }
   console.log("stateの確認完了！！");
 
