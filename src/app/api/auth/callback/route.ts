@@ -1,6 +1,7 @@
 import * as jose from "jose";
 import { getSession } from "@/lib/server/session";
 import { NextResponse } from "next/server";
+import { getDB } from "@/lib/server/database";
 
 export enum OIDCError {
   invalid_state = "invalid_state",
@@ -117,27 +118,37 @@ export async function GET(request: Request) {
     );
   }
 
-  // TODO: DB上のユーザ情報と照合(登録済みならログイン、未登録なら登録処理を行う)
+  // DB上のユーザ情報と照合(登録済みならログイン、未登録なら登録処理を行う)
+  const googleId = payload.sub as string;
+  const db = await getDB();
+  let user = Object.values(db.users).find((user) => user.googleId === googleId);
+  if (!user) {
+    // 未登録の場合は登録処理を行う。
+    user = {
+      id: crypto.randomUUID(),
+      name: payload.name as string,
+      picture: payload.picture as string,
+      googleId,
+    };
+    db.users[user.id] = user;
+    await db.save();
+    console.log("新規登録完了");
+  } else {
+    // 登録済みの場合は何もしない
+    console.log("登録済みユーザ");
+  }
 
-  // ユーザ情報の取得(本来はidトークンに含まれるため不要だが、学習のために取得)
-  // TODO: at_hashによるaccess_tokenの検証
-  const userInfoResponse = await fetch(
-    process.env.OIDC_ISSUER_USERINFO_ENDPOINT as string,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${data.access_token}`,
-      },
-    }
-  );
-  const userInfo = await userInfoResponse.json();
-  console.log(userInfo);
+  console.log(user);
+
+  // ここで必要に応じてaccess_tokenで/userinfoエンドポイントを叩いて情報を取得することもできる
+  // その場合はat_hashによるaccess_tokenの検証が必要
+  // ただし、今回はid_tokenの情報だけで十分なので省略する
 
   // ログイン処理
   session.user = {
-    id: userInfo.sub,
-    name: userInfo.name,
-    picture: userInfo.picture,
+    id: user.id,
+    name: user.name,
+    picture: user.picture,
   };
   session.auth = undefined; // 認可情報は不要なので削除
   await session.save();
