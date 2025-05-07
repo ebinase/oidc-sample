@@ -2,7 +2,11 @@ import { getSession } from "@/lib/server/session";
 import Image from "next/image";
 import { OIDCError } from "./api/auth/callback/route";
 
-export default async function Home({ searchParams }: { searchParams: Record<string, string> }) {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Record<string, string>;
+}) {
   // セッションからユーザ情報を取得
   const session = await getSession();
   const isLoggedIn = session.user !== undefined;
@@ -11,7 +15,7 @@ export default async function Home({ searchParams }: { searchParams: Record<stri
   // クエリパラメータによるエラーメッセージの表示
   const { error } = await searchParams;
   let errorMessage = "";
-  switch (error) { 
+  switch (error) {
     case undefined:
       errorMessage = "";
       break;
@@ -19,10 +23,16 @@ export default async function Home({ searchParams }: { searchParams: Record<stri
       errorMessage = "stateの検証に失敗しました。CSRF攻撃の可能性があります。";
       break;
     case OIDCError.code_verifier_not_found:
-      errorMessage = "PKCE用のcode_verifierが設定されていません。CSRF攻撃の可能性があります。";
+      errorMessage =
+        "PKCE用のcode_verifierが設定されていません。CSRF攻撃の可能性があります。";
       break;
     case OIDCError.token_fetch_failed:
-      errorMessage = "トークンの取得に失敗しました。コードインジェクション攻撃の可能性があります。";
+      errorMessage =
+        "トークンの取得に失敗しました。コードインジェクション攻撃の可能性があります。";
+      break;
+    case OIDCError.invalid_id_token:
+      errorMessage =
+        "idトークンの検証に失敗しました。改ざんされている可能性があります。";
       break;
     default:
       errorMessage = "不明なエラーが発生しました。";
@@ -41,9 +51,7 @@ export default async function Home({ searchParams }: { searchParams: Record<stri
           priority
         />
         <p className="text-xl font-bold">{`ようこそ、${username}さん！`}</p>
-        {errorMessage && (
-          <p className="text-red-500 text-sm">{errorMessage}</p>
-        )}
+        {errorMessage && <p className="text-red-500 text-sm">{errorMessage}</p>}
         <div className="flex gap-4 items-center flex-col sm:flex-row">
           {isLoggedIn ? (
             <a

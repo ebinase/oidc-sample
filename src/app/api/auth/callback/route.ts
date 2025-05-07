@@ -1,3 +1,4 @@
+import * as jose from "jose";
 import { getSession } from "@/lib/server/session";
 import { NextResponse } from "next/server";
 
@@ -5,6 +6,7 @@ export enum OIDCError {
   invalid_state = "invalid_state",
   code_verifier_not_found = "code_verifier_not_found",
   token_fetch_failed = "token_fetch_failed",
+  invalid_id_token = "invalid_id_token",
 }
 
 // OIDCのコールバックURL
@@ -18,13 +20,15 @@ export async function GET(request: Request) {
   // stateの検証
   const inputState = searchParams.get("state");
   const sessionState = session.auth?.state;
-  
+
   if (!inputState || !sessionState || inputState !== sessionState) {
     // stateが一致しない場合はCSRF攻撃の可能性があるため、エラーを返す
     console.error("CSRF attack detected: state mismatch");
     session.auth = undefined;
     await session.save();
-    return NextResponse.redirect(new URL(`/?error=${OIDCError.invalid_state}`, request.url));
+    return NextResponse.redirect(
+      new URL(`/?error=${OIDCError.invalid_state}`, request.url)
+    );
   }
   console.log("stateの確認完了！！");
 
@@ -35,7 +39,9 @@ export async function GET(request: Request) {
     console.error("PKCE verification failed: code_verifier not found");
     session.auth = undefined;
     await session.save();
-    return NextResponse.redirect(new URL(`/?error=${OIDCError.code_verifier_not_found}`, request.url));
+    return NextResponse.redirect(
+      new URL(`/?error=${OIDCError.code_verifier_not_found}`, request.url)
+    );
   }
 
   // 認可コードを取得
@@ -61,21 +67,47 @@ export async function GET(request: Request) {
 
   if (!tokenResponse.ok) {
     // トークン取得に失敗した場合はPKCEの検証に失敗した可能性が高い
-    console.error("Failed to fetch token:", `${tokenResponse.status}: ${tokenResponse.statusText}`);
+    console.error(
+      "Failed to fetch token:",
+      `${tokenResponse.status}: ${tokenResponse.statusText}`
+    );
     console.error("Response body:", await tokenResponse.json());
     session.auth = undefined;
     await session.save();
-    return NextResponse.redirect(new URL(`/?error=${OIDCError.token_fetch_failed}`, request.url));
+    return NextResponse.redirect(
+      new URL(`/?error=${OIDCError.token_fetch_failed}`, request.url)
+    );
   }
 
   const data = await tokenResponse.json();
   console.log(data);
 
-  // idトークンの検証
-  // TODO: idトークンの署名検証、nonceの検証、audの検証
+  // idトークンの署名とclaimの検証
+  const idToken = data.id_token as string;
+  const JWKS = jose.createRemoteJWKSet(
+    new URL(process.env.OIDC_ISSUER_JWKS_ENDPOINT as string)
+  );
+  let payload: jose.JWTPayload;
+  try {
+    const result = await jose.jwtVerify(idToken, JWKS, {
+      issuer: process.env.OIDC_ISSUER as string,
+      audience: process.env.OIDC_CLIENT_ID as string,
+    });
+    payload = result.payload;
+    console.log("payload", payload);
+  } catch (error) {
+    console.error("JWT verification failed:", error);
+    session.auth = undefined;
+    await session.save();
+    return NextResponse.redirect(
+      new URL(`/?error=${OIDCError.invalid_id_token}`, request.url)
+    );
+  }
+
   // TODO: DB上のユーザ情報と照合(登録済みならログイン、未登録なら登録処理を行う)
 
-  // ユーザ情報の取得
+  // ユーザ情報の取得(本来はidトークンに含まれるため不要だが、学習のために取得)
+  // TODO: at_hashによるaccess_tokenの検証
   const userInfoResponse = await fetch(
     process.env.OIDC_ISSUER_USERINFO_ENDPOINT as string,
     {
