@@ -34,6 +34,10 @@ export default async function Home({
       errorMessage =
         "idトークンの検証に失敗しました。改ざんされている可能性があります。";
       break;
+    case OIDCError.invalid_nonce:
+      errorMessage =
+        "nonceの検証に失敗しました。リプレイ攻撃の可能性があります。";
+      break;
     default:
       errorMessage = "不明なエラーが発生しました。";
       break;

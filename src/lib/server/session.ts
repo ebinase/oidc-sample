@@ -11,6 +11,7 @@ export type SessionData = {
   auth?: {
     state: string; // CSRF対策のためのstate
     code_verifier: string; // PKCE(+CSRF対策)のためのcode_verifier
+    nonce: string; // OIDCのnonce
   };
 };
 

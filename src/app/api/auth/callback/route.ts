@@ -7,6 +7,7 @@ export enum OIDCError {
   code_verifier_not_found = "code_verifier_not_found",
   token_fetch_failed = "token_fetch_failed",
   invalid_id_token = "invalid_id_token",
+  invalid_nonce = "invalid_nonce",
 }
 
 // OIDCのコールバックURL
@@ -101,6 +102,18 @@ export async function GET(request: Request) {
     await session.save();
     return NextResponse.redirect(
       new URL(`/?error=${OIDCError.invalid_id_token}`, request.url)
+    );
+  }
+
+  // nonceの検証
+  const sessionNonce = session.auth?.nonce;
+  if (!sessionNonce || sessionNonce !== payload.nonce) {
+    // nonceが一致しない場合はリプレイ攻撃の可能性があるため、エラーを返す
+    console.error("Replay attack detected: nonce mismatch");
+    session.auth = undefined;
+    await session.save();
+    return NextResponse.redirect(
+      new URL(`/?error=${OIDCError.invalid_nonce}`, request.url)
     );
   }
 

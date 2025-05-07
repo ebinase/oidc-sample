@@ -7,15 +7,18 @@ import pkceChallenge from "pkce-challenge";
 // nonceやstateを生成して、認可リクエストを行う
 export async function GET() {
   // 攻撃対策
-  // TODO: nonceの導入
+  // state
   const state = generateUrlSafeRandomString(32);
   // PKCE
   const { code_verifier, code_challenge } = await pkceChallenge();
+  // nonce
+  const nonce = generateUrlSafeRandomString(32);
 
   const session = await getSession();
   session.auth = {
     state,
     code_verifier,
+    nonce,
   };
   await session.save();
 
@@ -28,6 +31,7 @@ export async function GET() {
     state,
     code_challenge,
     code_challenge_method: "S256",
+    nonce,
   });
   const authURL = process.env.OIDC_ISSUER_AUTH_ENDPOINT as string;
   const authRequestURL = new URL(`${authURL}?${params.toString()}`);
