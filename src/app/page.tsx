@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/server/session";
+import { getLoginSession } from "@/lib/server/session";
 import Image from "next/image";
 import { OIDCError } from "./api/auth/callback/route";
 
@@ -8,9 +8,9 @@ export default async function Home({
   searchParams: Record<string, string>;
 }) {
   // セッションからユーザ情報を取得
-  const session = await getSession();
-  const isLoggedIn = session.user !== undefined;
-  const username = session.user?.name || "ゲスト";
+  const session = await getLoginSession();
+  const isLoggedIn = session.data !== undefined;
+  const username = session.data?.name ?? "ゲスト";
 
   // クエリパラメータによるエラーメッセージの表示
   const { error } = await searchParams;

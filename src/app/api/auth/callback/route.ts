@@ -1,5 +1,5 @@
 import * as jose from "jose";
-import { getSession } from "@/lib/server/session";
+import { getAuthSession, getLoginSession } from "@/lib/server/session";
 import { NextResponse } from "next/server";
 import { getDB } from "@/lib/server/database";
 
@@ -16,18 +16,18 @@ export enum OIDCError {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   console.log("searchParams", searchParams);
-  const session = await getSession();
-  console.log("session", session);
+  const authSession = await getAuthSession();
+  console.log("session", authSession);
 
   // stateの検証
   const inputState = searchParams.get("state");
-  const sessionState = session.auth?.state;
+  const sessionState = authSession.data?.state;
 
   if (!inputState || !sessionState || inputState !== sessionState) {
     // stateが一致しない場合はCSRF攻撃の可能性があるため、エラーを返す
     console.error("CSRF attack detected: state mismatch");
-    session.auth = undefined;
-    await session.save();
+    authSession.destroy();
+    await authSession.save();
     return NextResponse.redirect(
       new URL(`/?error=${OIDCError.invalid_state}`, request.url)
     );
@@ -35,12 +35,12 @@ export async function GET(request: Request) {
   console.log("stateの確認完了！！");
 
   // PKCEの存在チェック
-  const codeVerifier = session.auth?.code_verifier;
+  const codeVerifier = authSession.data?.code_verifier;
   if (!codeVerifier) {
     // code_verifierがsessionに存在しない場合はCSRF攻撃の可能性がある
     console.error("PKCE verification failed: code_verifier not found");
-    session.auth = undefined;
-    await session.save();
+    authSession.destroy();
+    await authSession.save();
     return NextResponse.redirect(
       new URL(`/?error=${OIDCError.code_verifier_not_found}`, request.url)
     );
@@ -74,8 +74,8 @@ export async function GET(request: Request) {
       `${tokenResponse.status}: ${tokenResponse.statusText}`
     );
     console.error("Response body:", await tokenResponse.json());
-    session.auth = undefined;
-    await session.save();
+    authSession.destroy();
+    await authSession.save();
     return NextResponse.redirect(
       new URL(`/?error=${OIDCError.token_fetch_failed}`, request.url)
     );
@@ -99,20 +99,20 @@ export async function GET(request: Request) {
     console.log("payload", payload);
   } catch (error) {
     console.error("JWT verification failed:", error);
-    session.auth = undefined;
-    await session.save();
+    authSession.destroy();
+    await authSession.save();
     return NextResponse.redirect(
       new URL(`/?error=${OIDCError.invalid_id_token}`, request.url)
     );
   }
 
   // nonceの検証
-  const sessionNonce = session.auth?.nonce;
+  const sessionNonce = authSession.data?.nonce;
   if (!sessionNonce || sessionNonce !== payload.nonce) {
     // nonceが一致しない場合はリプレイ攻撃の可能性があるため、エラーを返す
     console.error("Replay attack detected: nonce mismatch");
-    session.auth = undefined;
-    await session.save();
+    authSession.destroy();
+    await authSession.save();
     return NextResponse.redirect(
       new URL(`/?error=${OIDCError.invalid_nonce}`, request.url)
     );
@@ -145,13 +145,14 @@ export async function GET(request: Request) {
   // ただし、今回はid_tokenの情報だけで十分なので省略する
 
   // ログイン処理
-  session.user = {
+  const loginSession = await getLoginSession();
+  loginSession.data = {
     id: user.id,
     name: user.name,
     picture: user.picture,
   };
-  session.auth = undefined; // 認可情報は不要なので削除
-  await session.save();
+  await loginSession.save();
+  authSession.destroy();
 
   // トップページにリダイレクト
   return NextResponse.redirect(new URL("/", request.url));

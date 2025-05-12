@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/server/session";
+import { getAuthSession } from "@/lib/server/session";
 import { generateUrlSafeRandomString } from "@/lib/shared/base64";
 import { NextResponse } from "next/server";
 import pkceChallenge from "pkce-challenge";
@@ -14,13 +14,13 @@ export async function GET() {
   // nonce
   const nonce = generateUrlSafeRandomString(32);
 
-  const session = await getSession();
-  session.auth = {
+  const authSession = await getAuthSession();
+  authSession.data = {
     state,
     code_verifier,
     nonce,
   };
-  await session.save();
+  await authSession.save();
 
   // 認可リクエストのURLを生成
   const params = new URLSearchParams({
