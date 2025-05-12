@@ -11,6 +11,12 @@ export default async function Home({
   const session = await getLoginSession();
   const isLoggedIn = session.data !== undefined;
   const username = session.data?.name ?? "ゲスト";
+  const isFirstLogin = isLoggedIn && session.data?.loginCount === 1;
+  const wellcomeMessage = isLoggedIn
+    ? isFirstLogin
+      ? `はじめまして、${username}さん！`
+      : `おかえりなさい、${username}さん！`
+    : "ようこそ、ゲストさん！";
 
   // クエリパラメータによるエラーメッセージの表示
   const { error } = await searchParams;
@@ -54,7 +60,7 @@ export default async function Home({
           height={38}
           priority
         />
-        <p className="text-xl font-bold">{`ようこそ、${username}さん！`}</p>
+        <p className="text-xl font-bold">{wellcomeMessage}</p>
         {errorMessage && <p className="text-red-500 text-sm">{errorMessage}</p>}
         <div className="flex gap-4 items-center flex-col sm:flex-row">
           {isLoggedIn ? (
@@ -69,7 +75,7 @@ export default async function Home({
               href="/api/auth/login"
               className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
             >
-              Googleでログイン
+              ログイン
             </a>
           )}
         </div>

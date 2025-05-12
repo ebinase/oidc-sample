@@ -119,22 +119,22 @@ export async function GET(request: Request) {
   }
 
   // DB上のユーザ情報と照合(登録済みならログイン、未登録なら登録処理を行う)
-  const googleId = payload.sub as string;
+  const sub = payload.sub as string;
   const db = await getDB();
-  let user = Object.values(db.users).find((user) => user.googleId === googleId);
+  let user = Object.values(db.users).find((user) => user.externalId === sub);
   if (!user) {
     // 未登録の場合は登録処理を行う。
     user = {
       id: crypto.randomUUID(),
       name: payload.name as string,
       picture: payload.picture as string,
-      googleId,
+      externalId: sub,
+      loginCount: 0,
     };
     db.users[user.id] = user;
     await db.save();
     console.log("新規登録完了");
   } else {
-    // 登録済みの場合は何もしない
     console.log("登録済みユーザ");
   }
 
@@ -145,13 +145,20 @@ export async function GET(request: Request) {
   // ただし、今回はid_tokenの情報だけで十分なので省略する
 
   // ログイン処理
+  // ログイン回数をカウントアップ(UI用)
+  db.users[user.id].loginCount++;
+  await db.save();
+  // ログインセッションにユーザ情報を保存
   const loginSession = await getLoginSession();
   loginSession.data = {
     id: user.id,
     name: user.name,
     picture: user.picture,
+    loginCount: user.loginCount,
   };
   await loginSession.save();
+
+  // 認可コードやPKCEの情報は不要なので、セッションを破棄する
   authSession.destroy();
 
   // トップページにリダイレクト

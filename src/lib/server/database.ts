@@ -11,7 +11,9 @@ type User = {
   id: string;
   name: string;
   picture: string;
-  googleId: string;
+  externalId: string;
+  // UI上の表示用
+  loginCount: number;
 };
 export type DBSchema = {
   users: Record<string, User>;
