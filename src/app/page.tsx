@@ -18,26 +18,28 @@ export default async function Home({
 
   // データベースからユーザー情報を取得
   let username = "ゲスト";
-  let isFirstLogin = false;
+  let userIcon = ""; 
+  let loginCount = 0;
 
   if (isLoggedIn) {
-    const db = await getDB();
+    let db;
+    try {
+      db = await getDB();
+    } catch (error) {
+      console.error("データベースの取得に失敗しました", error);
+      return redirect("/api/auth/logout");
+    }
     const user = db.users[userId];
 
     if (user) {
       username = user.name;
-      isFirstLogin = user.loginCount === 1;
+      userIcon = user.picture;
+      loginCount = user.loginCount;
     } else {
       console.error("ユーザー情報がデータベースに存在しません");
       return redirect("/api/auth/logout");
     }
   }
-
-  const wellcomeMessage = isLoggedIn
-    ? isFirstLogin
-      ? `はじめまして、${username}さん！`
-      : `おかえりなさい、${username}さん！`
-    : "ようこそ、ゲストさん！";
 
   // クエリパラメータによるエラーメッセージの表示
   const { error } = await searchParams;
@@ -72,34 +74,51 @@ export default async function Home({
 
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <p className="text-xl font-bold">{wellcomeMessage}</p>
+      <main className="flex flex-col gap-[32px] row-start-2 items-center">
+        <h1 className="text-4xl font-bold">OIDC Sample</h1>
         {errorMessage && <p className="text-red-500 text-sm">{errorMessage}</p>}
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          {isLoggedIn ? (
-            <a
+        {/* コンテンツ */}
+        {isLoggedIn ? (
+          <>
+            <p className="text-lg">
+              ようこそ、{username}さん
+            </p>
+            <div className="flex items-center gap-4 border border-solid border-gray-300 dark:border-gray-700 rounded-lg p-4">
+              <Image
+                src={userIcon}
+                alt="User Icon"
+                width={48}
+                height={48}
+                className="rounded-full"
+                priority
+              />
+              <h2 className="text-2xl font-bold">{username}</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                ログイン回数: {loginCount}
+              </p>
+            </div>
+            <p className="text-lg">
+            </p>
+            <a 
               href="/api/auth/logout"
               className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
             >
               ログアウト
             </a>
-          ) : (
+          </>
+        ) : (
+          <>
+            <p className="text-lg">
+              はじめまして、ゲストさん
+            </p>
             <a
               href="/api/auth/login"
               className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
             >
               ログイン
             </a>
-          )}
-        </div>
+          </>
+        )}
       </main>
     </div>
   );
