@@ -34,9 +34,6 @@ export async function getAuthSession() {
 // ログインセッション
 export type LoginSessionData = {
   id: string;
-  name: string;
-  picture: string;
-  loginCount: number;
 };
 
 export const loginSessionOptions: SessionOptions = {

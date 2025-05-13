@@ -152,9 +152,6 @@ export async function GET(request: Request) {
   const loginSession = await getLoginSession();
   loginSession.data = {
     id: user.id,
-    name: user.name,
-    picture: user.picture,
-    loginCount: user.loginCount,
   };
   await loginSession.save();
 

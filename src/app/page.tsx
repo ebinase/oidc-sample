@@ -1,17 +1,38 @@
 import { getLoginSession } from "@/lib/server/session";
+import { getDB } from "@/lib/server/database"; // データベース取得用関数
 import Image from "next/image";
 import { OIDCError } from "./api/auth/callback/route";
+import { redirect } from "next/navigation";
 
 export default async function Home({
   searchParams,
 }: {
   searchParams: Record<string, string>;
 }) {
-  // セッションからユーザ情報を取得
+  // セッションからユーザーIDを取得
   const session = await getLoginSession();
-  const isLoggedIn = session.data !== undefined;
-  const username = session.data?.name ?? "ゲスト";
-  const isFirstLogin = isLoggedIn && session.data?.loginCount === 1;
+  const userId = session.data?.id;
+
+  // ログイン状態の判定
+  const isLoggedIn = !!userId;
+
+  // データベースからユーザー情報を取得
+  let username = "ゲスト";
+  let isFirstLogin = false;
+
+  if (isLoggedIn) {
+    const db = await getDB();
+    const user = db.users[userId];
+
+    if (user) {
+      username = user.name;
+      isFirstLogin = user.loginCount === 1;
+    } else {
+      console.error("ユーザー情報がデータベースに存在しません");
+      return redirect("/api/auth/logout");
+    }
+  }
+
   const wellcomeMessage = isLoggedIn
     ? isFirstLogin
       ? `はじめまして、${username}さん！`
